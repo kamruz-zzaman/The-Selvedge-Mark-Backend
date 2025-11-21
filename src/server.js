@@ -64,6 +64,7 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/audit", auditRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/settings", require("./routes/settings.routes"));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

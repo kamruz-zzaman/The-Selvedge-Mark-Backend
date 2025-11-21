@@ -1,48 +1,17 @@
 const express = require("express");
 const router = express.Router();
+const {
+  getSalesReport,
+  getTopProducts,
+  getTopCustomers,
+} = require("../controllers/report.controller");
 const { protect, authorize } = require("../middleware/auth");
 
-// @route   GET api/reports/sales
-// @desc    Get sales reports
-// @access  Private/Admin
-router.get("/sales", protect, authorize("admin"), async (req, res) => {
-  try {
-    res.json({
-      total: 15000,
-      monthly: [
-        1200, 1500, 1800, 1600, 1400, 1300, 1200, 1100, 1000, 1200, 1300, 1400,
-      ],
-      categories: {
-        clothing: 8000,
-        accessories: 4000,
-        footwear: 3000,
-      },
-    });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send("Server error");
-  }
-});
+router.use(protect);
+router.use(authorize("admin"));
 
-// @route   GET api/reports/inventory
-// @desc    Get inventory reports
-// @access  Private/Admin
-router.get("/inventory", protect, authorize("admin"), async (req, res) => {
-  try {
-    res.json({
-      total_items: 500,
-      low_stock: 25,
-      out_of_stock: 10,
-      categories: {
-        clothing: 300,
-        accessories: 150,
-        footwear: 50,
-      },
-    });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send("Server error");
-  }
-});
+router.get("/sales", getSalesReport);
+router.get("/products/top", getTopProducts);
+router.get("/customers/top", getTopCustomers);
 
 module.exports = router;
