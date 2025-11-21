@@ -25,8 +25,11 @@ exports.getProducts = async (req, res) => {
       (match) => `$${match}`
     );
 
-    // Finding resource
-    query = Product.find(JSON.parse(queryStr));
+    // Finding resource and populate category
+    query = Product.find(JSON.parse(queryStr)).populate(
+      "category",
+      "name slug"
+    );
 
     // Select Fields
     if (req.query.select) {
@@ -90,7 +93,10 @@ exports.getProducts = async (req, res) => {
 // @access  Public
 exports.getProduct = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findById(req.params.id).populate(
+      "category",
+      "name slug"
+    );
 
     if (!product) {
       return res.status(404).json({
@@ -103,7 +109,7 @@ exports.getProduct = async (req, res) => {
       success: true,
       data: product,
     });
-  } catch (err) {
+  } catch (error) {
     res.status(500).json({
       success: false,
       error: "Server Error",

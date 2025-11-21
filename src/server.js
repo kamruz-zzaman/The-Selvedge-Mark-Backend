@@ -21,6 +21,7 @@ const reportRoutes = require("./routes/report.routes");
 const notificationRoutes = require("./routes/notification.routes");
 const auditRoutes = require("./routes/audit.routes");
 const dashboardRoutes = require("./routes/dashboard.routes");
+const categoryRoutes = require("./routes/category.routes");
 
 // Initialize express app
 const app = express();
@@ -65,6 +66,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/audit", auditRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/settings", require("./routes/settings.routes"));
+app.use("/api/categories", categoryRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

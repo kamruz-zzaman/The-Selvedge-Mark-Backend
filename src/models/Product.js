@@ -25,9 +25,9 @@ const ProductSchema = new mongoose.Schema({
     min: [0, "Price must be a positive number"],
   },
   category: {
-    type: String,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Category",
     required: [true, "Please add a category"],
-    enum: ["jeans", "shirts", "jackets", "accessories"],
   },
   stock: {
     type: Number,
