@@ -1,20 +1,11 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const auth = require('../middleware/auth');
+const { protect } = require("../middleware/auth");
+const { recordCashOnDelivery } = require("../controllers/payment.controller");
 
-// @route   GET api/payments
-// @desc    Get all payments
+// @route   POST /api/payments
+// @desc    Record cash on delivery payment
 // @access  Private
-router.get('/', auth, async (req, res) => {
-  try {
-    res.json([
-      { id: 1, orderId: 1, amount: 99.99, method: 'credit_card', status: 'completed' },
-      { id: 2, orderId: 2, amount: 149.99, method: 'paypal', status: 'pending' }
-    ]);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
-  }
-});
+router.post("/", protect, recordCashOnDelivery);
 
 module.exports = router;

@@ -1,41 +1,53 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const ProductSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, 'Please add a product name'],
+    required: [true, "Please add a product name"],
     trim: true,
-    maxlength: [100, 'Name cannot be more than 100 characters']
+    maxlength: [100, "Name cannot be more than 100 characters"],
+  },
+  sku: {
+    type: String,
+    required: [true, "Please add a SKU"],
+    unique: true,
+    trim: true,
+    uppercase: true,
   },
   description: {
     type: String,
-    required: [true, 'Please add a description'],
-    maxlength: [1000, 'Description cannot be more than 1000 characters']
+    required: [true, "Please add a description"],
+    maxlength: [1000, "Description cannot be more than 1000 characters"],
   },
   price: {
     type: Number,
-    required: [true, 'Please add a price'],
-    min: [0, 'Price must be a positive number']
+    required: [true, "Please add a price"],
+    min: [0, "Price must be a positive number"],
   },
   category: {
     type: String,
-    required: [true, 'Please add a category'],
-    enum: ['jeans', 'shirts', 'jackets', 'accessories']
+    required: [true, "Please add a category"],
+    enum: ["jeans", "shirts", "jackets", "accessories"],
   },
   stock: {
     type: Number,
-    required: [true, 'Please add stock quantity'],
-    min: [0, 'Stock cannot be negative']
+    required: [true, "Please add stock quantity"],
+    min: [0, "Stock cannot be negative"],
   },
   images: [String],
   featured: {
     type: Boolean,
-    default: false
+    default: false,
+  },
+  status: {
+    type: String,
+    enum: ["active", "inactive"],
+    default: "active",
   },
   createdAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 });
 
-module.exports = mongoose.model('Product', ProductSchema);
+module.exports = mongoose.model("Product", ProductSchema);

@@ -1,32 +1,22 @@
-const express = require('express');
+const express = require("express");
+const {
+  getCustomers,
+  getCustomer,
+  getCustomerStats,
+  updateCustomer,
+} = require("../controllers/customer.controller");
+
 const router = express.Router();
-const auth = require('../middleware/auth');
 
-// @route   GET api/customers
-// @desc    Get all customers
-// @access  Private
-router.get('/', auth, async (req, res) => {
-  try {
-    res.json([
-      { id: 1, name: 'John Doe', email: 'john@example.com', phone: '555-1234' },
-      { id: 2, name: 'Jane Smith', email: 'jane@example.com', phone: '555-5678' }
-    ]);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
-  }
-});
+const { protect, authorize } = require("../middleware/auth");
 
-// @route   GET api/customers/:id
-// @desc    Get customer by ID
-// @access  Private
-router.get('/:id', auth, async (req, res) => {
-  try {
-    res.json({ id: 1, name: 'John Doe', email: 'john@example.com', phone: '555-1234' });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
-  }
-});
+router.use(protect);
+router.use(authorize("admin"));
+
+router.get("/stats", getCustomerStats);
+
+router.route("/").get(getCustomers);
+
+router.route("/:id").get(getCustomer).put(updateCustomer);
 
 module.exports = router;

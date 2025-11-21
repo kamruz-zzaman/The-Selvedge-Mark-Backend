@@ -1,116 +1,158 @@
-const Customer = require('../models/Customer');
-const { validationResult } = require('express-validator');
+const User = require("../models/User");
+const Order = require("../models/Order");
 
 // @desc    Get all customers
 // @route   GET /api/customers
 // @access  Private/Admin
-exports.getCustomers = async (req, res, next) => {
+exports.getCustomers = async (req, res) => {
   try {
-    const customers = await Customer.find();
-    
+    const customers = await User.find({ role: "user" });
+
+    // Get analytics for each customer
+    const customersWithAnalytics = await Promise.all(
+      customers.map(async (customer) => {
+        const orders = await Order.find({ user: customer._id });
+        const totalSpent = orders.reduce(
+          (sum, order) => sum + order.totalPrice,
+          0
+        );
+
+        return {
+          _id: customer._id,
+          name: customer.name,
+          email: customer.email,
+          phone: customer.phone || "",
+          orders: orders.length,
+          totalSpent: totalSpent,
+          dateJoined: customer.createdAt.toISOString().split("T")[0],
+          status: customer.status,
+        };
+      })
+    );
+
     res.status(200).json({
       success: true,
-      count: customers.length,
-      data: customers
+      count: customersWithAnalytics.length,
+      data: customersWithAnalytics,
     });
   } catch (err) {
-    next(err);
+    res.status(500).json({
+      success: false,
+      error: "Server Error",
+    });
+  }
+};
+
+// @desc    Get customer stats
+// @route   GET /api/customers/stats
+// @access  Private/Admin
+exports.getCustomerStats = async (req, res) => {
+  try {
+    const totalCustomers = await User.countDocuments({ role: "user" });
+
+    // New customers this week
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const newThisWeek = await User.countDocuments({
+      role: "user",
+      createdAt: { $gte: oneWeekAgo },
+    });
+
+    // Calculate average lifetime value
+    const orders = await Order.find({ payment: "paid" });
+    const avgLifetimeValue =
+      orders.length > 0
+        ? orders.reduce((sum, order) => sum + order.totalPrice, 0) /
+          totalCustomers
+        : 0;
+
+    // Calculate repeat rate
+    const customersWithOrders = await Order.distinct("user");
+    const customersWithMultipleOrders = await Order.aggregate([
+      { $group: { _id: "$user", count: { $sum: 1 } } },
+      { $match: { count: { $gt: 1 } } },
+    ]);
+    const repeatRate =
+      customersWithOrders.length > 0
+        ? (customersWithMultipleOrders.length / customersWithOrders.length) *
+          100
+        : 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalCustomers,
+        newThisWeek,
+        avgLifetimeValue: avgLifetimeValue.toFixed(2),
+        repeatRate: `${repeatRate.toFixed(0)}%`,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: "Server Error",
+    });
   }
 };
 
 // @desc    Get single customer
 // @route   GET /api/customers/:id
 // @access  Private/Admin
-exports.getCustomer = async (req, res, next) => {
+exports.getCustomer = async (req, res) => {
   try {
-    const customer = await Customer.findById(req.params.id);
-    
-    if (!customer) {
+    const customer = await User.findById(req.params.id);
+
+    if (!customer || customer.role !== "user") {
       return res.status(404).json({
         success: false,
-        error: 'Customer not found'
+        error: "Customer not found",
       });
     }
-    
+
+    const orders = await Order.find({ user: customer._id });
+    const totalSpent = orders.reduce((sum, order) => sum + order.totalPrice, 0);
+
     res.status(200).json({
       success: true,
-      data: customer
+      data: {
+        ...customer.toObject(),
+        orders: orders.length,
+        totalSpent,
+      },
     });
   } catch (err) {
-    next(err);
-  }
-};
-
-// @desc    Create new customer
-// @route   POST /api/customers
-// @access  Private/Admin
-exports.createCustomer = async (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-  
-  try {
-    const customer = await Customer.create(req.body);
-    
-    res.status(201).json({
-      success: true,
-      data: customer
+    res.status(500).json({
+      success: false,
+      error: "Server Error",
     });
-  } catch (err) {
-    next(err);
   }
 };
 
 // @desc    Update customer
 // @route   PUT /api/customers/:id
 // @access  Private/Admin
-exports.updateCustomer = async (req, res, next) => {
+exports.updateCustomer = async (req, res) => {
   try {
-    let customer = await Customer.findById(req.params.id);
-    
-    if (!customer) {
-      return res.status(404).json({
-        success: false,
-        error: 'Customer not found'
-      });
-    }
-    
-    customer = await Customer.findByIdAndUpdate(req.params.id, req.body, {
+    const customer = await User.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
-      runValidators: true
+      runValidators: true,
     });
-    
-    res.status(200).json({
-      success: true,
-      data: customer
-    });
-  } catch (err) {
-    next(err);
-  }
-};
 
-// @desc    Delete customer
-// @route   DELETE /api/customers/:id
-// @access  Private/Admin
-exports.deleteCustomer = async (req, res, next) => {
-  try {
-    const customer = await Customer.findById(req.params.id);
-    
-    if (!customer) {
+    if (!customer || customer.role !== "user") {
       return res.status(404).json({
         success: false,
-        error: 'Customer not found'
+        error: "Customer not found",
       });
     }
-    
-    await customer.deleteOne();
-    
+
     res.status(200).json({
       success: true,
-      data: {}
+      data: customer,
     });
   } catch (err) {
-    next(err);
+    res.status(400).json({
+      success: false,
+      error: err.message,
+    });
   }
 };
