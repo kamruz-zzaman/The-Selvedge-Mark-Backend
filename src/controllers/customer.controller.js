@@ -43,48 +43,79 @@ exports.getCustomers = async (req, res) => {
   }
 };
 
+// @desc    Create new customer
+// @route   POST /api/customers
+// @access  Private/Admin
+exports.createCustomer = async (req, res) => {
+  try {
+    const { name, email, phone, address, city, state, postalCode, country } =
+      req.body;
+
+    // Check if customer already exists
+    const existingCustomer = await User.findOne({ email });
+    if (existingCustomer) {
+      return res.status(400).json({
+        success: false,
+        error: "Customer with this email already exists",
+      });
+    }
+
+    // Create customer (user with role 'user')
+    const customer = await User.create({
+      name,
+      email,
+      password: Math.random().toString(36).slice(-8), // Random password
+      role: "user",
+      phone,
+      address,
+      city,
+      state,
+      postalCode,
+      country,
+      status: "active",
+    });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        _id: customer._id,
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone,
+        status: customer.status,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
 // @desc    Get customer stats
 // @route   GET /api/customers/stats
 // @access  Private/Admin
 exports.getCustomerStats = async (req, res) => {
   try {
     const totalCustomers = await User.countDocuments({ role: "user" });
-
-    // New customers this week
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const newThisWeek = await User.countDocuments({
+    const newCustomersThisMonth = await User.countDocuments({
       role: "user",
-      createdAt: { $gte: oneWeekAgo },
+      createdAt: {
+        $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+      },
     });
 
-    // Calculate average lifetime value
-    const orders = await Order.find({ payment: "paid" });
-    const avgLifetimeValue =
-      orders.length > 0
-        ? orders.reduce((sum, order) => sum + order.totalPrice, 0) /
-          totalCustomers
-        : 0;
-
-    // Calculate repeat rate
+    // Get customers with orders
     const customersWithOrders = await Order.distinct("user");
-    const customersWithMultipleOrders = await Order.aggregate([
-      { $group: { _id: "$user", count: { $sum: 1 } } },
-      { $match: { count: { $gt: 1 } } },
-    ]);
-    const repeatRate =
-      customersWithOrders.length > 0
-        ? (customersWithMultipleOrders.length / customersWithOrders.length) *
-          100
-        : 0;
 
     res.status(200).json({
       success: true,
       data: {
-        totalCustomers,
-        newThisWeek,
-        avgLifetimeValue: avgLifetimeValue.toFixed(2),
-        repeatRate: `${repeatRate.toFixed(0)}%`,
+        total: totalCustomers,
+        newThisMonth: newCustomersThisMonth,
+        withOrders: customersWithOrders.length,
+        withoutOrders: totalCustomers - customersWithOrders.length,
       },
     });
   } catch (err) {
@@ -109,15 +140,26 @@ exports.getCustomer = async (req, res) => {
       });
     }
 
+    // Get customer orders
     const orders = await Order.find({ user: customer._id });
     const totalSpent = orders.reduce((sum, order) => sum + order.totalPrice, 0);
 
     res.status(200).json({
       success: true,
       data: {
-        ...customer.toObject(),
+        _id: customer._id,
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone,
+        address: customer.address,
+        city: customer.city,
+        state: customer.state,
+        postalCode: customer.postalCode,
+        country: customer.country,
+        status: customer.status,
         orders: orders.length,
-        totalSpent,
+        totalSpent: totalSpent,
+        dateJoined: customer.createdAt,
       },
     });
   } catch (err) {
@@ -133,10 +175,7 @@ exports.getCustomer = async (req, res) => {
 // @access  Private/Admin
 exports.updateCustomer = async (req, res) => {
   try {
-    const customer = await User.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    const customer = await User.findById(req.params.id);
 
     if (!customer || customer.role !== "user") {
       return res.status(404).json({
@@ -145,14 +184,38 @@ exports.updateCustomer = async (req, res) => {
       });
     }
 
+    const {
+      name,
+      email,
+      phone,
+      address,
+      city,
+      state,
+      postalCode,
+      country,
+      status,
+    } = req.body;
+
+    customer.name = name || customer.name;
+    customer.email = email || customer.email;
+    customer.phone = phone || customer.phone;
+    customer.address = address || customer.address;
+    customer.city = city || customer.city;
+    customer.state = state || customer.state;
+    customer.postalCode = postalCode || customer.postalCode;
+    customer.country = country || customer.country;
+    customer.status = status || customer.status;
+
+    const updatedCustomer = await customer.save();
+
     res.status(200).json({
       success: true,
-      data: customer,
+      data: updatedCustomer,
     });
   } catch (err) {
-    res.status(400).json({
+    res.status(500).json({
       success: false,
-      error: err.message,
+      error: "Server Error",
     });
   }
 };

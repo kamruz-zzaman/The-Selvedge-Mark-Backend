@@ -1,5 +1,6 @@
 const Order = require("../models/Order");
 const Product = require("../models/Product");
+const User = require("../models/User");
 
 // @desc    Create new order
 // @route   POST /api/orders
@@ -16,6 +17,9 @@ exports.createOrder = async (req, res) => {
       payment,
       status,
       notes,
+      customerEmail,
+      customerName,
+      customerPhone,
     } = req.body;
 
     // Support both 'orderItems' and 'products' field names
@@ -26,6 +30,42 @@ exports.createOrder = async (req, res) => {
         success: false,
         error: "No order items",
       });
+    }
+
+    let customerId = user;
+
+    // If no user ID provided but we have customer info, create or find customer
+    if (!customerId && (customerEmail || req.user)) {
+      const email = customerEmail || req.user.email;
+      const name = customerName || req.user.name;
+      const phone = customerPhone || req.user.phone;
+
+      // Check if customer exists
+      let customer = await User.findOne({ email });
+
+      if (!customer) {
+        // Create new customer
+        customer = await User.create({
+          name: name || "Guest Customer",
+          email,
+          phone: phone || "",
+          password: Math.random().toString(36).slice(-8), // Random password
+          role: "user",
+          address: shippingAddress?.address || "",
+          city: shippingAddress?.city || "",
+          state: shippingAddress?.state || "",
+          postalCode: shippingAddress?.postalCode || "",
+          country: shippingAddress?.country || "",
+          status: "active",
+        });
+      }
+
+      customerId = customer._id;
+    }
+
+    // If still no customer ID, use authenticated user
+    if (!customerId && req.user) {
+      customerId = req.user._id;
     }
 
     // Calculate prices and check stock
@@ -63,7 +103,7 @@ exports.createOrder = async (req, res) => {
     }
 
     const order = new Order({
-      user: user || req.user._id, // Use provided user or authenticated user
+      user: customerId,
       products: processedItems,
       shippingAddress,
       paymentMethod,
@@ -92,8 +132,8 @@ exports.createOrder = async (req, res) => {
 exports.getOrderById = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      .populate("user", "name email")
-      .populate("products.product", "name price");
+      .populate("user", "name email phone")
+      .populate("products.product", "name price sku images");
 
     if (!order) {
       return res.status(404).json({
@@ -159,6 +199,56 @@ exports.getOrders = async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Server Error",
+    });
+  }
+};
+
+// @desc    Update order status
+// @route   PUT /api/orders/:id/status
+// @access  Private/Admin
+exports.updateOrderStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    const validStatuses = [
+      "pending",
+      "processing",
+      "shipped",
+      "delivered",
+      "cancelled",
+    ];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
+      });
+    }
+
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: "Order not found",
+      });
+    }
+
+    order.status = status;
+
+    if (status === "delivered") {
+      order.deliveredAt = Date.now();
+    }
+
+    const updatedOrder = await order.save();
+
+    res.status(200).json({
+      success: true,
+      data: updatedOrder,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
     });
   }
 };

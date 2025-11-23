@@ -4,6 +4,7 @@ const {
   getCustomer,
   getCustomerStats,
   updateCustomer,
+  createCustomer,
 } = require("../controllers/customer.controller");
 
 const router = express.Router();
@@ -15,7 +16,7 @@ router.use(authorize("admin"));
 
 router.get("/stats", getCustomerStats);
 
-router.route("/").get(getCustomers);
+router.route("/").get(getCustomers).post(createCustomer);
 
 router.route("/:id").get(getCustomer).put(updateCustomer);
 
