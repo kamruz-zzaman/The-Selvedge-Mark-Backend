@@ -6,9 +6,22 @@ const Product = require("../models/Product");
 // @access  Private
 exports.createOrder = async (req, res) => {
   try {
-    const { orderItems, shippingAddress, paymentMethod } = req.body;
+    const {
+      orderItems,
+      products,
+      shippingAddress,
+      paymentMethod,
+      user,
+      totalPrice: providedTotal,
+      payment,
+      status,
+      notes,
+    } = req.body;
 
-    if (orderItems && orderItems.length === 0) {
+    // Support both 'orderItems' and 'products' field names
+    const items = orderItems || products;
+
+    if (!items || items.length === 0) {
       return res.status(400).json({
         success: false,
         error: "No order items",
@@ -19,7 +32,7 @@ exports.createOrder = async (req, res) => {
     let totalPrice = 0;
     const processedItems = [];
 
-    for (const item of orderItems) {
+    for (const item of items) {
       const product = await Product.findById(item.product);
 
       if (!product) {
@@ -43,19 +56,20 @@ exports.createOrder = async (req, res) => {
       processedItems.push({
         product: product._id,
         quantity: item.quantity,
-        price: product.price,
+        price: item.price || product.price,
       });
 
-      totalPrice += product.price * item.quantity;
+      totalPrice += (item.price || product.price) * item.quantity;
     }
 
     const order = new Order({
-      user: req.user._id,
+      user: user || req.user._id, // Use provided user or authenticated user
       products: processedItems,
       shippingAddress,
       paymentMethod,
-      totalPrice,
-      status: "pending",
+      totalPrice: providedTotal || totalPrice,
+      payment: payment || "pending",
+      status: status || "pending",
     });
 
     const createdOrder = await order.save();
